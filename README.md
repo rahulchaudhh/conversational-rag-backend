@@ -33,6 +33,11 @@ A FastAPI backend implementing the two required REST services: the **Document In
 
 ---
 
+![alt text](image-3.png)
+![alt text](image-4.png)
+![alt text](image-6.png)
+![alt text](image-5.png)
+
 ## Tech Stack
 
 - **Framework**: FastAPI + Uvicorn
