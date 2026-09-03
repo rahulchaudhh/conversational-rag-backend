@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+python-multipart
+sqlalchemy
+pydantic-settings
+pinecone
+redis
+sentence-transformers
+pypdf
+python-dotenv
+anthropic
+pytest
+httpx
