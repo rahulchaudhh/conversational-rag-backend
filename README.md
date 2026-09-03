@@ -1,6 +1,6 @@
 # Document Ingestion & Conversational RAG Backend
 
-A FastAPI backend implementing the two required REST services: the **Document Ingestion API** (PDF/TXT extraction, dual chunking, Pinecone indexing) and the **Conversational RAG API** (custom retrieval, Redis multi-turn memory, and LLM-driven interview booking).
+Build a FastAPI backend implementing the two required REST services: the **Document Ingestion API** (PDF/TXT extraction, dual chunking, Pinecone indexing) and the **Conversational RAG API** (custom retrieval, Redis multi-turn memory, and LLM-driven interview booking).
 
 
 
