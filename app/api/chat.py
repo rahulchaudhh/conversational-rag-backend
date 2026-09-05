@@ -82,7 +82,7 @@ async def chat_endpoint(
             
             # Remove the raw JSON from the final reply and append a success system message
             reply = re.sub(r"<booking>.*?</booking>", "", reply, flags=re.DOTALL).strip()
-            reply += f"\n\n✅ Interview successfully booked! (Booking ID: {booking_record.id})"
+            reply += f"\n\n Interview successfully booked! (Booking ID: {booking_record.id})"
             
         except (json.JSONDecodeError, ValidationError):
             reply = "I noticed you want to book an interview, but some details were missing or invalid. Please ensure you provide your full name, email, date (YYYY-MM-DD), and time (HH:MM)."
