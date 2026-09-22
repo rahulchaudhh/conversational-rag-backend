@@ -251,4 +251,3 @@ def clear_session_history(
         return {"message": f"Session {session_id} history cleared successfully."}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to clear history: {str(exc)}") from exc
->>>>>>> 9eee846 (Add minimal Claude-style chat UI with history, document list, and backend improvements)
