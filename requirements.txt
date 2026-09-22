@@ -25,3 +25,9 @@ pypdf
 
 # Environment
 python-dotenv
+
+# Testing
+pytest
+anyio
+pytest-anyio
+httpx
