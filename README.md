@@ -1,211 +1,242 @@
-# Document Ingestion & Conversational RAG Backend
+# Conversational RAG Backend
 
-A FastAPI backend implementing two core REST services: the **Document Ingestion API** (PDF/TXT extraction, dual chunking, Pinecone indexing) and the **Conversational RAG API** (custom retrieval, Redis multi-turn memory, native Claude tool-calling, and live streaming SSE), coupled with a **Claude-inspired minimal Chat Interface**.
+A FastAPI-based backend for document-grounded chat and interview booking. It ingests PDF/TXT files, indexes chunks in Pinecone with `BAAI/bge-small-en-v1.5` embeddings, uses Redis for chat memory and rate limiting, and generates responses with Anthropic Claude (including tool-calling for bookings). A bundled static frontend is served from `/`.
 
----
+![Python](https://img.shields.io/badge/Python-3.12-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-API-009688)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED)
 
-## Features & What I Built
+## Table of Contents
+- [Architecture and Capabilities](#architecture-and-capabilities)
+- [Project Structure](#project-structure)
+- [Prerequisites](#prerequisites)
+- [Environment Variables](#environment-variables)
+- [Local Development Setup](#local-development-setup)
+- [Docker Compose Setup](#docker-compose-setup)
+- [API Endpoints](#api-endpoints)
+- [Usage Examples](#usage-examples)
+- [Testing](#testing)
+- [Troubleshooting](#troubleshooting)
 
-### 1. Minimal Claude-Inspired Web UI (`http://localhost:8000`)
-- **Centered Conversational Layout**: Distraction-free ~760px column with equal breathing room and document-grade typography (`15.5px`, `1.7` line-height).
-- **Collapsible Workspace Sidebar**:
-  - **Indexed Documents (Show PDF/TXT)**: Live overview of all ingested documents with filenames and chunk count badges, plus quick upload.
-  - **Chat History**: Multi-turn Redis conversation history with search, session switching, message count pills, and deletion.
-  - **Scheduled Interviews Modal**: Quick table view of all booked interviews.
-- **Real-Time Token Streaming**: Streams tokens from Claude via Server-Sent Events (SSE).
-- **Frictionless Composer Bar**: Rounded floating composer with subtle auto-activating send button on typing.
-- **Empty State Quick Actions**: One-click prompt cards ("Book an interview", "Ask about documents", "Ask about our services").
+## Architecture and Capabilities
 
-### 2. Document Ingestion API (`POST /documents/upload`)
-- **File Parsing**: Handles `.pdf` (using `pypdf`) and `.txt` files.
-- **Selectable Chunking Strategies**:
-  - `recursive` (default): Recursively splits text using natural separators (`\n\n`, `\n`, `. `, ` `, `""`) to keep coherent paragraphs together.
-  - `fixed`: Splits text into fixed character windows with customizable overlap (default 500 chars, 50 overlap).
-- **Embeddings**: Generates normalized 384-dimensional dense vectors locally using `sentence-transformers` with `BAAI/bge-small-en-v1.5`.
-- **Vector Storage**: Stores vectors and text chunks into **Pinecone** under the configured index and namespace with metadata (`document_id`, `filename`, `chunk_index`, `text`).
-- **Database Metadata**: Records document details (`id`, `filename`, `file_type`, `chunking_strategy`, `total_chunks`, `uploaded_at`) into SQL via SQLAlchemy.
-
-### 3. Conversational RAG & Booking API (`POST /chat/`)
-- **Custom RAG (No `RetrievalQAChain`)**:
-  - Query rewrite & embedding using `bge-small-en-v1.5`.
-  - Top-k vector retrieval from Pinecone injected into system context.
-- **Multi-Turn Memory with Redis**:
-  - Chat history stored in Redis under `chat:<session_id>` as serialized message turns.
-  - Prior exchanges loaded on each request to maintain multi-turn context.
-- **Native Tool Calling**:
-  - Automatically collects required booking details: full name, email, interview date (YYYY-MM-DD), and time (HH:MM).
-  - Uses Claude's native `book_interview` tool definition to validate and store bookings into SQL.
-- **SSE Streaming Support**: Optional `stream: true` in request body for real-time token streaming.
-- **Rate Limiting**: Built-in sliding-window rate limiter powered by Redis (`RATE_LIMIT_CHAT_RPM`, `RATE_LIMIT_UPLOAD_RPM`).
-
----
-
-![alt text](image-3.png)
-![alt text](image-4.png)
-![alt text](image-6.png)
-![alt text](image-5.png)
-
----
-
-## Tech Stack
-
-- **Framework**: FastAPI + Uvicorn
-- **LLM**: Anthropic Claude (`claude-haiku-4-5-20251001`) via official `anthropic` SDK
-- **Embeddings**: `sentence-transformers` (`BAAI/bge-small-en-v1.5`)
-- **Vector Database**: Pinecone
-- **Memory & Cache**: Redis (Local / Redis Cloud)
-- **Database / ORM**: SQLite / PostgreSQL via SQLAlchemy 2.0
-- **Frontend**: Vanilla HTML5, CSS3 (Claude-inspired minimal theme), JavaScript (ES6+)
-- **Containerization & CI/CD**: Docker, Docker Compose, GitHub Actions
-
----
+- **FastAPI API** with routers for documents and chat
+- **Document ingestion** for `.pdf` and `.txt` files
+- **Chunking strategies**:
+  - `recursive` (separator-aware)
+  - `fixed` (default 500 chars with 50 overlap)
+- **Embeddings** via `sentence-transformers` using `BAAI/bge-small-en-v1.5`
+- **Vector storage/retrieval** in Pinecone
+- **Redis-backed memory** for multi-turn session history (`chat:<session_id>`)
+- **Redis-backed rate limiting** for upload/chat endpoints
+- **Anthropic Claude integration** for response generation
+- **Claude tool-calling** (`book_interview`) to persist interview bookings
+- **SQLAlchemy persistence** for uploaded document metadata and bookings
+- **SSE streaming** for token-by-token chat responses
+- **Bundled frontend** (`frontend/`) served as static files from `/`
 
 ## Project Structure
 
 ```text
-projectrag/
+conversational-rag-backend/
 ├── app/
 │   ├── api/
-│   │   ├── chat.py             # Chat endpoint, SSE streaming, booking tool, session history
-│   │   └── documents.py        # Upload endpoint (PDF/TXT extraction, chunking, Pinecone indexing)
+│   │   ├── chat.py
+│   │   └── documents.py
 │   ├── core/
-│   │   ├── config.py           # Application settings loaded from .env
-│   │   ├── dependencies.py     # FastAPI dependency injections
-│   │   └── rate_limiter.py     # Redis-backed rate limiter
+│   │   ├── config.py
+│   │   ├── dependencies.py
+│   │   └── rate_limiter.py
 │   ├── db/
-│   │   ├── database.py         # SQLAlchemy engine and session factory
-│   │   └── models.py           # ORM models for Document and Booking
+│   │   ├── database.py
+│   │   └── models.py
 │   ├── memory/
-│   │   └── redis_memory.py     # Redis session-based conversation manager
+│   │   └── redis_memory.py
 │   ├── schemas/
-│   │   ├── booking.py          # Pydantic models for interview booking
-│   │   ├── chat.py             # ChatRequest and ChatResponse schemas
-│   │   └── document.py         # Document upload response schema
+│   │   ├── booking.py
+│   │   ├── chat.py
+│   │   └── document.py
 │   ├── services/
-│   │   ├── booking_service.py  # Service to persist bookings to database
-│   │   ├── chunking_service.py # Fixed-size and recursive chunking implementations
-│   │   ├── document_service.py # File extraction for PDF and TXT
-│   │   ├── embedding_service.py# SentenceTransformers vector generation
-│   │   ├── llm_service.py      # Anthropic Messages API client & tool calling
-│   │   └── rag_service.py      # Vector search and prompt context assembly
+│   │   ├── booking_service.py
+│   │   ├── chunking_service.py
+│   │   ├── document_service.py
+│   │   ├── embedding_service.py
+│   │   ├── llm_service.py
+│   │   └── rag_service.py
 │   ├── vector_store/
-│   │   └── pinecone.py         # Pinecone client for upsert, search, and delete
-│   └── main.py                 # FastAPI application entrypoint & static mounting
+│   │   └── pinecone.py
+│   └── main.py
 ├── frontend/
-│   ├── index.html              # Clean, centered Claude-style chat interface
-│   ├── style.css               # Minimalist stylesheet with collapsible sidebar
-│   └── app.js                  # SSE streaming, session manager & document listing
+│   ├── app.js
+│   ├── index.html
+│   └── style.css
 ├── tests/
-│   ├── test_chunking.py        # Chunking strategy unit tests
-│   ├── test_chat_tools.py      # Booking tool validation tests
-│   └── test_endpoints.py       # API integration tests
-├── Dockerfile                  # Container definition
-├── docker-compose.yml          # Multi-container orchestration (App + Redis)
-├── sample_document.txt         # Sample file for testing ingestion and RAG
-├── requirements.txt
-├── requirements-dev.txt
+│   ├── conftest.py
+│   ├── test_chat_tools.py
+│   ├── test_chunking.py
+│   └── test_endpoints.py
 ├── .env.example
-├── .gitignore
-└── README.md
+├── docker-compose.yml
+├── Dockerfile
+├── requirements.txt
+└── requirements-dev.txt
 ```
 
----
+## Prerequisites
 
-## Getting Started
+- Python 3.12 recommended
+- Redis instance (local or cloud)
+- Pinecone API key + existing index
+- Anthropic API key
+- (Optional) Docker + Docker Compose
 
-### 1. Clone the repository and navigate into it
-```bash
-git clone https://github.com/rahulchaudhh/conversational-rag-backend.git
-cd conversational-rag-backend
-```
+## Environment Variables
 
-### 2. Create and activate a virtual environment
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
+Copy `.env.example` to `.env`:
 
-### 3. Install dependencies
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Configure Environment Variables
-Copy `.env.example` to `.env` and configure your credentials:
 ```bash
 cp .env.example .env
 ```
 
-Required variables:
-```env
-ANTHROPIC_API_KEY=your_anthropic_api_key
-CLAUDE_MODEL=claude-haiku-4-5-20251001
+| Variable | Required | Description |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Yes | Anthropic API key |
+| `CLAUDE_MODEL` | No | Claude model name (default in config: `claude-haiku-4-5-20251001`) |
+| `EMBEDDING_MODEL` | No | Embedding model (default: `BAAI/bge-small-en-v1.5`) |
+| `PINECONE_API_KEY` | Yes | Pinecone API key |
+| `PINECONE_INDEX` | Yes | Pinecone index name |
+| `PINECONE_NAMESPACE` | No | Pinecone namespace |
+| `REDIS_URL` | Yes | Redis connection URL |
+| `DATABASE_URL` | Yes | SQLAlchemy DB URL (`sqlite:///./rag.db` by default) |
+| `RATE_LIMIT_CHAT_RPM` | No | Chat requests/minute |
+| `RATE_LIMIT_UPLOAD_RPM` | No | Upload requests/minute |
 
-EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
+**Redis URL note**
+- Local dev (outside Docker): `redis://localhost:6379/0`
+- Docker Compose app->redis networking: `redis://redis:6379/0`
 
-PINECONE_API_KEY=your_pinecone_api_key
-PINECONE_INDEX=rag-documents
-PINECONE_NAMESPACE=documents
+## Local Development Setup
 
-REDIS_URL=redis://localhost:6379/0  # or your Redis Cloud URL
-DATABASE_URL=sqlite:///./rag.db     # or PostgreSQL connection string
-
-RATE_LIMIT_CHAT_RPM=30
-RATE_LIMIT_UPLOAD_RPM=10
-```
-
-### 5. Run the Server
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+cp .env.example .env
 uvicorn app.main:app --reload
 ```
-Open your browser at **`http://127.0.0.1:8000`** to access the Chat Interface.  
-Interactive Swagger API documentation is available at **`http://127.0.0.1:8000/docs`**.
 
----
+Open:
+- App/frontend: `http://127.0.0.1:8000/`
+- OpenAPI docs: `http://127.0.0.1:8000/docs`
 
-## Docker Setup
-
-Run the entire application along with Redis in Docker:
+## Docker Compose Setup
 
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
-Access the application at `http://localhost:8000`.
 
----
+Notes:
+- The provided compose file builds/runs the FastAPI app.
+- Redis service is present as commented template; if enabling local Redis in compose, also set `REDIS_URL=redis://redis:6379/0` for the app container.
+- If using Redis Cloud, keep `REDIS_URL` pointed to your cloud endpoint.
 
-## API Reference
+## API Endpoints
 
-### 1. Document Ingestion (`POST /documents/upload`)
-Upload a PDF or TXT file using either `recursive` or `fixed` chunking:
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/health` | Health check |
+| `POST` | `/documents/upload` | Upload + parse + chunk + embed + index document |
+| `GET` | `/documents/` | List uploaded documents metadata |
+| `POST` | `/chat/` | Chat with RAG + optional SSE streaming + booking tool calls |
+| `GET` | `/chat/sessions` | List active Redis chat sessions |
+| `GET` | `/chat/bookings` | List stored interview bookings |
+| `GET` | `/chat/{session_id}/history` | Get message history for a session |
+| `DELETE` | `/chat/{session_id}` | Clear one session’s history |
+
+### Request examples
+
+Upload document:
 ```bash
 curl -X POST "http://127.0.0.1:8000/documents/upload" \
-  -F "file=@sample_document.txt" \
+  -F "file=@/absolute/path/to/file.txt" \
   -F "chunking_strategy=recursive"
 ```
 
-### 2. List Indexed Documents (`GET /documents/`)
-```bash
-curl -X GET "http://127.0.0.1:8000/documents/"
-```
-
-### 3. Conversational RAG & Streaming (`POST /chat/`)
+Non-stream chat:
 ```bash
 curl -X POST "http://127.0.0.1:8000/chat/" \
   -H "Content-Type: application/json" \
   -d '{
-    "session_id": "session1",
-    "message": "What services are described in the uploaded document?",
+    "session_id": "demo-session",
+    "message": "Summarize the uploaded document.",
+    "stream": false
+  }'
+```
+
+SSE streaming chat:
+```bash
+curl -N -X POST "http://127.0.0.1:8000/chat/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session_id": "demo-session",
+    "message": "What does the document say about interview rounds?",
     "stream": true
   }'
 ```
 
-### 4. Active Sessions (`GET /chat/sessions`)
+When `stream=true`, the endpoint returns `text/event-stream` and emits events like token chunks, optional booking events, and a final done event.
+
+## Usage Examples
+
+### 1) Upload a document
 ```bash
-curl -X GET "http://127.0.0.1:8000/chat/sessions"
+curl -X POST "http://127.0.0.1:8000/documents/upload" \
+  -F "file=@/absolute/path/to/candidate_guide.pdf" \
+  -F "chunking_strategy=fixed"
 ```
 
-### 5. Scheduled Bookings (`GET /chat/bookings`)
+### 2) Ask a question about uploaded docs
+```bash
+curl -X POST "http://127.0.0.1:8000/chat/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session_id": "candidate-session-1",
+    "message": "What requirements are listed for this role?",
+    "stream": false
+  }'
+```
+
+### 3) Book an interview
+The booking flow is tool-driven. Provide required details in chat (`name`, `email`, `interview_date`, `interview_time`) and Claude can call `book_interview` internally. Then verify bookings:
+
 ```bash
 curl -X GET "http://127.0.0.1:8000/chat/bookings"
 ```
+
+## Testing
+
+Install dev dependencies and run tests:
+
+```bash
+pip install -r requirements-dev.txt
+pytest -q
+```
+
+If your shell environment does not already provide required settings, ensure `.env` exists (for example by copying `.env.example`).
+
+## Troubleshooting
+
+- **Redis connection issues**
+  - Verify `REDIS_URL` matches your runtime environment (`localhost` vs `redis` hostname in Docker network).
+  - If Redis is unavailable, session history and rate-limiter behavior will degrade/fail.
+
+- **Pinecone upload failures**
+  - Confirm `PINECONE_API_KEY`, `PINECONE_INDEX`, and `PINECONE_NAMESPACE`.
+  - Ensure your Pinecone index dimension matches embedding output (`BAAI/bge-small-en-v1.5` outputs 384-dim vectors).
+
+- **Unsupported file type errors**
+  - Only `.pdf` and `.txt` are accepted by upload endpoints.
+
+- **Empty extraction/chunking errors**
+  - Scanned/image-only PDFs may produce no extractable text with `pypdf`.
