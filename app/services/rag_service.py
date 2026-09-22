@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional
 
 from app.services.embedding_service import EmbeddingService
 from app.vector_store.pinecone import PineconeService
@@ -7,9 +7,13 @@ from app.vector_store.pinecone import PineconeService
 class RAGService:
     """Service for retrieving relevant context from the knowledge base."""
 
-    def __init__(self) -> None:
-        self.embedding_service = EmbeddingService()
-        self.pinecone_service = PineconeService()
+    def __init__(
+        self,
+        embedding_service: Optional[EmbeddingService] = None,
+        pinecone_service: Optional[PineconeService] = None,
+    ) -> None:
+        self.embedding_service = embedding_service or EmbeddingService()
+        self.pinecone_service = pinecone_service or PineconeService()
 
     def retrieve_context(
         self,

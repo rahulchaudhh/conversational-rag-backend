@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "sqlite:///./rag.db"
 
+    # Rate Limiting
+    rate_limit_chat_rpm: int = 30  # requests per minute for /chat/
+    rate_limit_upload_rpm: int = 10  # uploads per minute for /documents/upload
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

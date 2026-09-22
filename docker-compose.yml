@@ -1,0 +1,46 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rag-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Override Redis URL to use the docker-compose redis service
+      # Comment this out if you use a CLOUD Redis (like your Redis Cloud instance)
+      # REDIS_URL: redis://redis:6379/0
+      
+      # Force CPU-only inference
+      CUDA_VISIBLE_DEVICES: ""
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    # Uncomment the redis dependency if you switch to local redis
+    # depends_on:
+    #   redis:
+    #     condition: service_healthy
+
+  # ─── Optional: Local Redis (uncomment if you don't want Redis Cloud) ───
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: rag-redis
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   restart: unless-stopped
+
+# volumes:
+#   redis_data:

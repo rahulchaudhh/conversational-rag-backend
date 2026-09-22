@@ -1,13 +1,27 @@
+# Core
 fastapi
 uvicorn[standard]
 python-multipart
+aiofiles
+
+# Database
 sqlalchemy
+psycopg2-binary
+
+# Validation & Settings
 pydantic-settings
-pinecone
-redis
-sentence-transformers
-pypdf
-python-dotenv
+email-validator
+
+# AI / ML
 anthropic
-pytest
-httpx
+sentence-transformers
+pinecone
+
+# Memory
+redis
+
+# Document Parsing
+pypdf
+
+# Environment
+python-dotenv
