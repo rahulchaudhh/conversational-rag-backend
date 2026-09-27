@@ -39,9 +39,8 @@ A FastAPI backend implementing two core REST services: the **Document Ingestion 
 - **Rate Limiting**: Built-in sliding-window rate limiter powered by Redis (`RATE_LIMIT_CHAT_RPM`, `RATE_LIMIT_UPLOAD_RPM`).
 
 ---
+<img width="1470" height="918" alt="image" src="https://github.com/user-attachments/assets/4788c490-06d2-43ee-a4d8-92833b32549d" />
 
-![alt text](image-3.png)
-![alt text](image-4.png)
 ![alt text](image-6.png)
 ![alt text](image-5.png)
 
